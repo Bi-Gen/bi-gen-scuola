@@ -414,17 +414,18 @@ function StudentiPage() {
     return studentiWithClasse.filter(s => s.classe?.livello === filterLivello);
   }, [studentiWithClasse, filterLivello]);
 
+  // Stats calcolate sui dati FILTRATI
   const stats = useMemo(() => {
-    const maschi = data.studenti.filter(s => s.genere === 'M').length;
-    const femmine = data.studenti.filter(s => s.genere === 'F').length;
-    const nuoveIscrizioni2025 = data.studenti.filter(s => s.dataIscrizione.startsWith('2025')).length;
-    return { maschi, femmine, nuoveIscrizioni2025, totale: data.studenti.length };
-  }, []);
+    const maschi = filteredStudenti.filter(s => s.genere === 'M').length;
+    const femmine = filteredStudenti.filter(s => s.genere === 'F').length;
+    const nuoveIscrizioni2025 = filteredStudenti.filter(s => s.dataIscrizione.startsWith('2025')).length;
+    return { maschi, femmine, nuoveIscrizioni2025, totale: filteredStudenti.length };
+  }, [filteredStudenti]);
 
-  const distribuzioneGenere = [
+  const distribuzioneGenere = useMemo(() => [
     { name: 'Maschi', value: stats.maschi },
     { name: 'Femmine', value: stats.femmine },
-  ];
+  ], [stats]);
 
   return (
     <div className="space-y-6">
@@ -499,13 +500,15 @@ function StudentiPage() {
         </div>
 
         <div className="bg-white rounded-xl p-4 lg:p-6 shadow-sm border border-gray-100">
-          <h3 className="font-semibold text-gray-900 mb-4">Studenti per Classe</h3>
+          <h3 className="font-semibold text-gray-900 mb-4">Studenti per Classe {filterLivello !== 'Tutti' ? `(${filterLivello})` : ''}</h3>
           <ResponsiveContainer width="100%" height={250}>
-            <BarChart data={data.classi.map(c => ({
-              nome: c.nome.replace(' Primaria', '').replace(' Secondaria', '').replace('Infanzia ', ''),
-              studenti: data.studenti.filter(s => s.classeId === c.id).length,
-              capienza: c.capienza
-            }))}>
+            <BarChart data={data.classi
+              .filter(c => filterLivello === 'Tutti' || c.livello === filterLivello)
+              .map(c => ({
+                nome: c.nome.replace(' Primaria', '').replace(' Secondaria', '').replace('Infanzia ', ''),
+                studenti: filteredStudenti.filter(s => s.classeId === c.id).length,
+                capienza: c.capienza
+              }))}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
               <XAxis dataKey="nome" tick={{ fontSize: 10 }} angle={-45} textAnchor="end" height={60} />
               <YAxis tick={{ fontSize: 12 }} />
@@ -581,26 +584,6 @@ function StudentiPage() {
 function RettePage() {
   const [filterStato, setFilterStato] = useState('Tutti');
 
-  const stats = useMemo(() => {
-    const pagate = data.rette.filter(r => r.stato === 'pagata');
-    const nonPagate = data.rette.filter(r => r.stato === 'non_pagata');
-    const totaleIncassato = pagate.reduce((sum, r) => sum + r.importo, 0);
-    const totaleInsoluto = nonPagate.reduce((sum, r) => sum + r.importo, 0);
-    const tassoIncasso = ((pagate.length / data.rette.length) * 100).toFixed(1);
-
-    // Scadenze prossimi 7 giorni
-    const oggi = new Date('2026-02-06');
-    const fra7giorni = new Date(oggi);
-    fra7giorni.setDate(fra7giorni.getDate() + 7);
-
-    const inScadenza = data.rette.filter(r => {
-      const scadenza = new Date(r.scadenza);
-      return r.stato === 'non_pagata' && scadenza >= oggi && scadenza <= fra7giorni;
-    }).length;
-
-    return { pagate: pagate.length, nonPagate: nonPagate.length, totaleIncassato, totaleInsoluto, tassoIncasso, inScadenza };
-  }, []);
-
   const retteWithStudente = useMemo(() => {
     return data.rette.map(r => {
       const studente = data.studenti.find(s => s.id === r.studenteId);
@@ -613,9 +596,47 @@ function RettePage() {
     return retteWithStudente.filter(r => r.stato === filterStato);
   }, [retteWithStudente, filterStato]);
 
+  // Stats globali (sempre su tutti i dati per avere il quadro completo)
+  const globalStats = useMemo(() => {
+    const pagate = data.rette.filter(r => r.stato === 'pagata');
+    const nonPagate = data.rette.filter(r => r.stato === 'non_pagata');
+    const totaleIncassato = pagate.reduce((sum, r) => sum + r.importo, 0);
+    const totaleInsoluto = nonPagate.reduce((sum, r) => sum + r.importo, 0);
+    const tassoIncasso = ((pagate.length / data.rette.length) * 100).toFixed(1);
+
+    const oggi = new Date('2026-02-06');
+    const fra7giorni = new Date(oggi);
+    fra7giorni.setDate(fra7giorni.getDate() + 7);
+
+    const inScadenza = data.rette.filter(r => {
+      const scadenza = new Date(r.scadenza);
+      return r.stato === 'non_pagata' && scadenza >= oggi && scadenza <= fra7giorni;
+    }).length;
+
+    return { pagate: pagate.length, nonPagate: nonPagate.length, totaleIncassato, totaleInsoluto, tassoIncasso, inScadenza };
+  }, []);
+
+  // Stats filtrate per i KPI dinamici
+  const filteredStats = useMemo(() => {
+    const pagate = filteredRette.filter(r => r.stato === 'pagata');
+    const nonPagate = filteredRette.filter(r => r.stato === 'non_pagata');
+    const totaleImporto = filteredRette.reduce((sum, r) => sum + r.importo, 0);
+    const totaleIncassato = pagate.reduce((sum, r) => sum + r.importo, 0);
+    const totaleInsoluto = nonPagate.reduce((sum, r) => sum + r.importo, 0);
+
+    return {
+      totale: filteredRette.length,
+      pagate: pagate.length,
+      nonPagate: nonPagate.length,
+      totaleImporto,
+      totaleIncassato,
+      totaleInsoluto
+    };
+  }, [filteredRette]);
+
   const statusData = [
-    { name: 'Pagate', value: stats.pagate },
-    { name: 'Non Pagate', value: stats.nonPagate },
+    { name: 'Pagate', value: globalStats.pagate },
+    { name: 'Non Pagate', value: globalStats.nonPagate },
   ];
 
   return (
@@ -633,32 +654,33 @@ function RettePage() {
         </select>
       </div>
 
-      {/* KPI */}
+      {/* KPI - mostrano i dati filtrati */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <KPICard
-          title="Totale Incassato"
-          value={`€${stats.totaleIncassato.toLocaleString()}`}
+          title={filterStato === 'Tutti' ? 'Totale Incassato' : filterStato === 'pagata' ? 'Importo Pagato' : 'Importo Insoluto'}
+          value={`€${(filterStato === 'non_pagata' ? filteredStats.totaleInsoluto : filteredStats.totaleIncassato).toLocaleString()}`}
+          subtitle={`${filteredStats.totale} rate ${filterStato !== 'Tutti' ? 'filtrate' : 'totali'}`}
           icon={Euro}
-          trend="up"
-          trendValue="+5%"
+          trend={filterStato === 'Tutti' ? 'up' : undefined}
+          trendValue={filterStato === 'Tutti' ? '+5%' : undefined}
           color="emerald"
         />
         <KPICard
           title="Totale Insoluto"
-          value={`€${stats.totaleInsoluto.toLocaleString()}`}
-          subtitle={`${stats.nonPagate} rate`}
+          value={`€${globalStats.totaleInsoluto.toLocaleString()}`}
+          subtitle={`${globalStats.nonPagate} rate`}
           icon={AlertTriangle}
           color="red"
         />
         <KPICard
           title="Tasso Incasso"
-          value={`${stats.tassoIncasso}%`}
+          value={`${globalStats.tassoIncasso}%`}
           icon={CheckCircle}
           color="teal"
         />
         <KPICard
           title="In Scadenza"
-          value={stats.inScadenza}
+          value={globalStats.inScadenza}
           subtitle="Prossimi 7 giorni"
           icon={Clock}
           color="amber"
@@ -666,11 +688,11 @@ function RettePage() {
       </div>
 
       {/* Alerts for unpaid */}
-      {stats.nonPagate > 0 && (
+      {globalStats.nonPagate > 0 && filterStato !== 'pagata' && (
         <AlertCard
           type="danger"
           title="Attenzione: Rate Insolute"
-          description={`Ci sono ${stats.nonPagate} rate non pagate per un totale di €${stats.totaleInsoluto.toLocaleString()}`}
+          description={`Ci sono ${globalStats.nonPagate} rate non pagate per un totale di €${globalStats.totaleInsoluto.toLocaleString()}`}
         />
       )}
 
@@ -1049,19 +1071,27 @@ function ClassiPage() {
     return classiWithStats.filter(c => c.livello === filterLivello);
   }, [classiWithStats, filterLivello]);
 
+  // Stats calcolate sui dati FILTRATI
   const stats = useMemo(() => {
-    const totaleClassi = data.classi.length;
-    const totaleDocenti = data.docenti.length;
-    const capienzaTotale = data.classi.reduce((sum, c) => sum + c.capienza, 0);
-    const studentiTotali = data.studenti.length;
-    const occupazioneMedia = ((studentiTotali / capienzaTotale) * 100).toFixed(0);
-    const rapportoStudentiDocenti = (studentiTotali / totaleDocenti).toFixed(1);
-    return { totaleClassi, totaleDocenti, occupazioneMedia, rapportoStudentiDocenti };
-  }, []);
+    const totaleClassi = filteredClassi.length;
+    const capienzaTotale = filteredClassi.reduce((sum, c) => sum + c.capienza, 0);
+    const studentiTotali = filteredClassi.reduce((sum, c) => sum + c.studenti, 0);
+    const occupazioneMedia = capienzaTotale > 0 ? ((studentiTotali / capienzaTotale) * 100).toFixed(0) : '0';
 
+    // Docenti filtrati per livello
+    const docentiLivello = filterLivello === 'Tutti'
+      ? data.docenti
+      : data.docenti.filter(d => d.livello === filterLivello || d.livello === 'Tutti');
+    const totaleDocenti = docentiLivello.length;
+    const rapportoStudentiDocenti = totaleDocenti > 0 ? (studentiTotali / totaleDocenti).toFixed(1) : '0';
+
+    return { totaleClassi, totaleDocenti, occupazioneMedia, rapportoStudentiDocenti, studentiTotali };
+  }, [filteredClassi, filterLivello]);
+
+  // Occupazione per livello - usa i dati filtrati
   const occupazionePerLivello = useMemo(() => {
     const perLivello = {};
-    classiWithStats.forEach(c => {
+    filteredClassi.forEach(c => {
       if (!perLivello[c.livello]) {
         perLivello[c.livello] = { studenti: 0, capienza: 0 };
       }
@@ -1072,7 +1102,7 @@ function ClassiPage() {
       name,
       occupazione: ((v.studenti / v.capienza) * 100).toFixed(0)
     }));
-  }, [classiWithStats]);
+  }, [filteredClassi]);
 
   return (
     <div className="space-y-6">
@@ -1178,7 +1208,9 @@ function ClassiPage() {
       {/* Docenti Table */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="p-4 border-b border-gray-100">
-          <h3 className="font-semibold text-gray-900">Corpo Docente</h3>
+          <h3 className="font-semibold text-gray-900">
+            Corpo Docente {filterLivello !== 'Tutti' ? `(${filterLivello})` : ''} ({stats.totaleDocenti})
+          </h3>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -1191,7 +1223,9 @@ function ClassiPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {data.docenti.map((docente) => (
+              {data.docenti
+                .filter(d => filterLivello === 'Tutti' || d.livello === filterLivello || d.livello === 'Tutti')
+                .map((docente) => (
                 <tr key={docente.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
