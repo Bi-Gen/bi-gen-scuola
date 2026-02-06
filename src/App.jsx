@@ -1327,14 +1327,14 @@ function ReportisticaPage() {
             <XAxis dataKey="anno" tick={{ fontSize: 12 }} />
             <YAxis yAxisId="left" tick={{ fontSize: 12 }} />
             <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 12 }} tickFormatter={(v) => `€${v/1000}k`} />
-            <Tooltip formatter={(value, name) => [
-              name === 'studenti' ? value : `€${value.toLocaleString()}`,
-              name === 'studenti' ? 'Studenti' : name === 'rette' ? 'Rette' : 'Servizi'
-            ]} />
+            <Tooltip formatter={(value, name) => {
+              if (name === 'Studenti') return [value, 'Studenti'];
+              return [`€${value.toLocaleString()}`, name];
+            }} />
             <Legend />
-            <Area yAxisId="left" type="monotone" dataKey="studenti" stroke="#10b981" fill="#10b981" fillOpacity={0.2} name="Studenti" />
-            <Area yAxisId="right" type="monotone" dataKey="rette" stroke="#14b8a6" fill="#14b8a6" fillOpacity={0.2} name="Rette" />
-            <Area yAxisId="right" type="monotone" dataKey="servizi" stroke="#0ea5e9" fill="#0ea5e9" fillOpacity={0.2} name="Servizi" />
+            <Area yAxisId="left" type="monotone" dataKey="studenti" stroke="#10b981" fill="#10b981" fillOpacity={0.3} name="Studenti" />
+            <Area yAxisId="right" type="monotone" dataKey="rette" stroke="#8b5cf6" fill="#8b5cf6" fillOpacity={0.3} name="Rette" />
+            <Area yAxisId="right" type="monotone" dataKey="servizi" stroke="#f59e0b" fill="#f59e0b" fillOpacity={0.3} name="Servizi" />
           </AreaChart>
         </ResponsiveContainer>
       </div>
